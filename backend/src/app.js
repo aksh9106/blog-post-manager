@@ -2,39 +2,41 @@ require('dotenv').config();
 require('express-async-errors');
 
 const express = require('express');
-const app = express();
-const connectDB = require('./db/connect');
-const postRouter = require('./routes/postRoutes');
-
-// middleware
 const cors = require('cors');
 const helmet = require('helmet');
 const xss = require('xss-clean');
-const rateLimiter = require('express-rate-limit');
+const rateLimit = require('express-rate-limit');
 
+const connectDB = require('./db/connect');
+const postRoutes = require('./routes/postRoutes');
 const notFoundMiddleware = require('./middleware/not-found');
-const errorHandlerMiddleware = require('./middleware/errorHandler');
+const errorHandlerMiddleware = require('./middleware/error-handler');
 
-app.set('trust proxy', 1);
+const app = express();
+const port = process.env.PORT || 5000;
+
+// Security middleware
+app.use(helmet());
+app.use(cors());
+app.use(xss());
 app.use(
-  rateLimiter({
+  rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
   })
 );
+
+// Body parser
 app.use(express.json());
-app.use(helmet());
-app.use(cors());
-app.use(xss());
 
-// routes
-app.use('/api/v1/posts', postRouter);
+// Routes
+app.use('/api/v1/posts', postRoutes);
 
+// Error handling middleware
 app.use(notFoundMiddleware);
 app.use(errorHandlerMiddleware);
 
-const port = process.env.PORT || 5000;
-
+// Start server
 const start = async () => {
   try {
     await connectDB(process.env.MONGO_URI);
@@ -46,4 +48,10 @@ const start = async () => {
   }
 };
 
-start();
+// Export the app for testing
+module.exports = { app, start };
+
+// Start the server if this file is run directly
+if (require.main === module) {
+  start();
+}
